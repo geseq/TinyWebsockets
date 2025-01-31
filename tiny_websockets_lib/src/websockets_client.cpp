@@ -9,9 +9,9 @@ namespace websockets {
         // Empty
     }
 
-    WebsocketsClient::WebsocketsClient(std::shared_ptr<network::TcpClient> client) : 
+    WebsocketsClient::WebsocketsClient(std::shared_ptr<network::TcpClient> client) :
         _client(client),
-        _endpoint(client), 
+        _endpoint(client),
         _connectionOpen(client->available()),
         _messagesCallback([](WebsocketsClient&, WebsocketsMessage){}),
         _eventsCallback([](WebsocketsClient&, WebsocketsEvent, WSInterfaceString){}),
@@ -19,32 +19,32 @@ namespace websockets {
         // Empty
     }
 
-    WebsocketsClient::WebsocketsClient(const WebsocketsClient& other) : 
+    WebsocketsClient::WebsocketsClient(const WebsocketsClient& other) :
         _client(other._client),
         _endpoint(other._endpoint),
         _connectionOpen(other._client->available()),
         _messagesCallback(other._messagesCallback),
         _eventsCallback(other._eventsCallback),
         _sendMode(other._sendMode) {
-        
+
         // delete other's client
         const_cast<WebsocketsClient&>(other)._client = nullptr;
         const_cast<WebsocketsClient&>(other)._connectionOpen = false;
     }
-    
-    WebsocketsClient::WebsocketsClient(const WebsocketsClient&& other) : 
+
+    WebsocketsClient::WebsocketsClient(const WebsocketsClient&& other) :
         _client(other._client),
         _endpoint(other._endpoint),
         _connectionOpen(other._client->available()),
         _messagesCallback(other._messagesCallback),
         _eventsCallback(other._eventsCallback),
         _sendMode(other._sendMode) {
-        
+
         // delete other's client
         const_cast<WebsocketsClient&>(other)._client = nullptr;
         const_cast<WebsocketsClient&>(other)._connectionOpen = false;
     }
-    
+
     WebsocketsClient& WebsocketsClient::operator=(const WebsocketsClient& other) {
         // call endpoint's copy operator
         _endpoint = other._endpoint;
@@ -55,7 +55,7 @@ namespace websockets {
         this->_eventsCallback = other._eventsCallback;
         this->_connectionOpen = other._connectionOpen;
         this->_sendMode = other._sendMode;
-    
+
         // delete other's client
         const_cast<WebsocketsClient&>(other)._client = nullptr;
         const_cast<WebsocketsClient&>(other)._connectionOpen = false;
@@ -72,7 +72,7 @@ namespace websockets {
         this->_eventsCallback = other._eventsCallback;
         this->_connectionOpen = other._connectionOpen;
         this->_sendMode = other._sendMode;
-    
+
         // delete other's client
         const_cast<WebsocketsClient&>(other)._client = nullptr;
         const_cast<WebsocketsClient&>(other)._connectionOpen = false;
@@ -83,9 +83,9 @@ namespace websockets {
         WSString requestStr;
         WSString expectedAcceptKey;
     };
-    HandshakeRequestResult generateHandshake(const WSString& host, const WSString& uri, 
+    HandshakeRequestResult generateHandshake(const WSString& host, const WSString& uri,
                                              const std::vector<std::pair<WSString, WSString>>& customHeaders) {
-        
+
         WSString key = crypto::base64Encode(crypto::randomBytes(16));
 
         WSString handshake = "GET " + uri + " HTTP/1.1\r\n";
@@ -122,7 +122,7 @@ namespace websockets {
 
     bool isCaseInsensetiveEqual(const WSString lhs, const WSString rhs) {
       if (lhs.size() != rhs.size()) return false;
-      
+
       for (size_t i = 0; i < lhs.size(); i++) {
         char leftLowerCaseChar = lhs[i] >= 'A' && lhs[i] <= 'Z' ? lhs[i] - 'A' + 'a' : lhs[i];
         char righerLowerCaseChar = rhs[i] >= 'A' && rhs[i] <= 'Z' ? rhs[i] - 'A' + 'a' : rhs[i];
@@ -135,7 +135,7 @@ namespace websockets {
     HandshakeResponseResult parseHandshakeResponse(std::vector<WSString> responseHeaders) {
         bool didUpgradeToWebsockets = false, isConnectionUpgraded = false;
         WSString serverAccept = "";
-        for(WSString header : responseHeaders) {            
+        for(WSString header : responseHeaders) {
             auto colonIndex = header.find_first_of(':');
 
             WSString key = header.substr(0, colonIndex);
@@ -173,7 +173,7 @@ namespace websockets {
     }
 
     void WebsocketsClient::addHeader(const WSInterfaceString key, const WSInterfaceString value) {
-        _customHeaders.push_back({internals::fromInterfaceString(key), internals::fromInterfaceString(value)}); 
+        _customHeaders.push_back({internals::fromInterfaceString(key), internals::fromInterfaceString(value)});
     }
 
     bool WebsocketsClient::connect(WSInterfaceString _url) {
@@ -202,9 +202,9 @@ namespace websockets {
             defaultPort = 443;
             protocol = "https";
             url = url.substr(8); //strlen("https://") == 8
-            
+
             upgradeToSecuredConnection();
-        } 
+        }
     #endif
 
         else {
@@ -233,10 +233,10 @@ namespace websockets {
 
             host = onlyHost;
         }
-        
+
         return this->connect(
-            internals::fromInternalString(host), 
-            port, 
+            internals::fromInternalString(host),
+            port,
             internals::fromInternalString(uri)
         );
     }
@@ -261,11 +261,11 @@ namespace websockets {
             if (line == "\r\n") break;
             // remove /r/n from line end
             line = line.substr(0, line.size() - 2);
-            
+
             serverResponseHeaders.push_back(line);
         }
         auto parsedResponse = parseHandshakeResponse(serverResponseHeaders);
-        
+
 #ifdef _WS_CONFIG_SKIP_HANDSHAKE_ACCEPT_VALIDATION
         bool serverAcceptMismatch = false;
 #else
@@ -300,15 +300,18 @@ namespace websockets {
         };
     }
 
-    bool WebsocketsClient::poll() {
+    bool WebsocketsClient::poll(bool yield_on_no_msg = false) {
         bool messageReceived = false;
         while(available() && _endpoint.poll()) {
             auto msg = _endpoint.recv();
             if(msg.isEmpty()) {
+                if(yield_on_no_msg) {
+                    std::this_thread::yield();
+                }
                 continue;
             }
             messageReceived = true;
-            
+
             if(msg.isBinary() || msg.isText()) {
                 this->_messagesCallback(*this, std::move(msg));
             } else if(msg.isContinuation()) {
@@ -347,7 +350,7 @@ namespace websockets {
         auto str = internals::fromInterfaceString(data);
         return this->send(str.c_str(), str.size());
     }
-    
+
     bool WebsocketsClient::send(const char* data) {
         return this->send(data, strlen(data));
     }
@@ -368,8 +371,8 @@ namespace websockets {
             else if(this->_sendMode == SendMode_Streaming) {
                 // send a continue frame
                 return _endpoint.send(
-                    data, 
-                    len, 
+                    data,
+                    len,
                     internals::ContentType::Continuation,
                     false
                 );
@@ -399,8 +402,8 @@ namespace websockets {
             else if(this->_sendMode == SendMode_Streaming) {
                 // send a continue frame
                 return _endpoint.send(
-                    data, 
-                    len, 
+                    data,
+                    len,
                     internals::ContentType::Continuation,
                     false
                 );
@@ -413,21 +416,21 @@ namespace websockets {
         if(available() && this->_sendMode == SendMode_Normal) {
             this->_sendMode = SendMode_Streaming;
             return _endpoint.send(
-                internals::fromInterfaceString(data), 
-                internals::ContentType::Text, 
+                internals::fromInterfaceString(data),
+                internals::ContentType::Text,
                 false
             );
         }
         return false;
     }
 
-    
+
     bool WebsocketsClient::streamBinary(const WSInterfaceString data) {
         if(available() && this->_sendMode == SendMode_Normal) {
             this->_sendMode = SendMode_Streaming;
             return _endpoint.send(
-                internals::fromInterfaceString(data), 
-                internals::ContentType::Binary, 
+                internals::fromInterfaceString(data),
+                internals::ContentType::Binary,
                 false
             );
         }
@@ -438,8 +441,8 @@ namespace websockets {
         if(available() && this->_sendMode == SendMode_Streaming) {
             this->_sendMode = SendMode_Normal;
             return _endpoint.send(
-                internals::fromInterfaceString(data), 
-                internals::ContentType::Continuation, 
+                internals::fromInterfaceString(data),
+                internals::ContentType::Continuation,
                 true
             );
         }
@@ -456,7 +459,7 @@ namespace websockets {
         }
 
         bool updatedConnectionOpen = this->_connectionOpen && this->_client && this->_client->available();
-        
+
         if(updatedConnectionOpen != this->_connectionOpen) {
             _endpoint.close(CloseReason_AbnormalClosure);
             this->_eventsCallback(*this, WebsocketsEvent::ConnectionClosed, "");
