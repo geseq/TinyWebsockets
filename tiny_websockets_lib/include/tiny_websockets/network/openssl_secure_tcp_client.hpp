@@ -25,7 +25,7 @@ namespace websockets { namespace network {
           //fprintf(stdout, "SSL_new() failed\n");
           return false;
         }
-        SSL_set_tlsext_host_name(ssl, host.c_str());
+        SSL_set_tlsext_host_name(ssl, static_cast<const char*>(host.c_str()));
         bool didConnect = TcpClientImpl::connect(host, port);
         if(didConnect == false) return false;
 
@@ -70,7 +70,7 @@ namespace websockets { namespace network {
         }
         return static_cast<uint32_t>(numReceived);
       }
-      
+
       void close() override {
         if(ssl != nullptr) {
           SSL_free(ssl);
