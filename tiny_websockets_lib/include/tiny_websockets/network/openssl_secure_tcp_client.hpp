@@ -26,6 +26,7 @@ namespace websockets { namespace network {
           return false;
         }
         SSL_set1_host(ssl, host.c_str());
+        SSL_ctrl(ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, const_cast<char*>(host.c_str()));
         bool didConnect = TcpClientImpl::connect(host, port);
         if(didConnect == false) return false;
 
